@@ -105,3 +105,11 @@ venv.bak/
 
 # project dataset
 the-movies-dataset/
+
+# PyCharm IDE
+.idea
+
+.DS_Store
+
+# sqlite
+recommender/database.sqlite3
