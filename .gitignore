@@ -113,3 +113,6 @@ the-movies-dataset/
 
 # sqlite
 recommender/database.sqlite3
+
+# dataset
+ml-100k/
