@@ -1,7 +1,21 @@
-from fastai.collab import ifnone, partial, defaults, Config
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 import numpy as np
 import pandas as pd
+from pathlib import Path
+import os
+
+DATA_PATH = Path(os.getcwd())
+
+
+def partial(f, *args, **kwargs):
+    def applied(*args2, **kwargs2):
+        return f(*([*args, *args2]), **({**kwargs, **kwargs2}))
+    
+    return applied
+
+
+def ifnone(a, b):
+    return a if a is not None else b
 
 
 class KNN:
@@ -65,7 +79,7 @@ class KNN:
         return (indices[order], distances[order])
 
     def get_knn(self, k=5, n_jobs=None):
-        n_jobs = ifnone(n_jobs, defaults.cpus)
+        n_jobs = ifnone(n_jobs, cpu_count())
         indices = self.features.index
         func = partial(self.get_knn_i, k=k)
         if n_jobs > 1:
@@ -83,7 +97,7 @@ class KNN:
 
 
 if __name__ == "__main__":
-    path = Config.data_path()/'ml-100k'
+    path = DATA_PATH / 'ml-100k'
     read_csv = partial(pd.read_csv, header=None,
                        encoding="ISO-8859-1", sep="|")
     user_columns = ["user_id", "age", "gender", "occupation", "zip_code"]
