@@ -4,7 +4,7 @@ import pandas as pd
 from pathlib import Path
 import os
 
-DATA_PATH = Path(os.getcwd())
+DATA_PATH = Path("")
 
 
 def partial(f, *args, **kwargs):
@@ -27,10 +27,30 @@ class KNN:
         if categories:
             self.features = df.drop(categories, axis=1)
             self.categories = df[categories]
+    
+    def add_element(self, element):
+        def row_append(df, row):
+            return df.append({k : v for k, v in zip(self.features.keys(), row)}, ignore_index=True)
+        
+        _, mCont = self.features.shape
+        _, mCat = self.categories.shape if self.categories is not None else (0, 0)
+        if len(element) != mCont + mCat:
+            raise ValueError("""dimension mismatch
+                                element must have as many values as the knn instance has features and categorical variables.
+                                ({0} + {1})""".format(mCont, mCat))                            
+        
+        feature = element[:mCont]
+        category = element[mCont:]
+        
+        self.features = row_append(self.features, feature)
+        self.categories = row_append(self.categories, category)
+        
+        return self.features.index[-1]
+        
 
     def filter_categories(self, index, feature_arr, indices, k):
         elemCategories = self.categories.iloc[index]
-        candidateIndices = set(self.categories.index).difference([index])
+        candidateIndices = set(self.categories.index)
 
         for category in self.categories:
             discriminant = elemCategories[category]
@@ -68,7 +88,6 @@ class KNN:
 
     def get_knn_i(self, index, n=0, k=5):
         element, neighbors, indices = self.get_candidates(index, k)
-
         distances = np.sqrt(np.sum((element - neighbors)**2, axis=1))
 
         if len(distances) < k:
@@ -77,8 +96,20 @@ class KNN:
         order = np.argpartition(distances, k-1, axis=0)[:k]
 
         return (indices[order], distances[order])
+    
+    def query(self, element, k=5):
+        old_features = self.features
+        old_categories = self.categories
+        
+        index = self.add_element(element)        
+        result = self.get_knn_i(index, k=k)
+        
+        self.features = old_features
+        self.categories = old_categories
+        
+        return result
 
-    def get_knn(self, k=5, n_jobs=None):
+    def get_knn(self, k=5, n_jobs=1):
         n_jobs = ifnone(n_jobs, cpu_count())
         indices = self.features.index
         func = partial(self.get_knn_i, k=k)
