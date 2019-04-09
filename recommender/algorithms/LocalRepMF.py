@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from .DivRank import DivRank as dr
 
 class LocalRepMF(object):
     """
@@ -38,11 +39,50 @@ class LocalRepMF(object):
         #
         raise NotImplementedError()
 
+def generate_candidate_items(ratings : pd.DataFrame, boundry : int):
+    ratingsMatrix = to_matrix(ratings)
+    colike_network = colike_itemitem_network(ratingsMatrix, boundry)
 
-if __name__ == "__main__":
-    data = pd.read_csv("../ml-100k/u1.base", delimiter = "\t", header=None)
-    LRMF = LocalRepMF()
-    LRMF.fit(data, 2, 2)
+def colike_itemitem_network(ratingsMatrix : np.ndarray, boundry : int):
+    _, n_items = ratingsMatrix.shape
+    matrix = np.zeros(shape=(n_items, n_items))
 
-    print("DONATELLO")
+    for item1 in range(0, n_items):
+        for item2 in range(0, n_items):
+            value = 0
+            if item1 != item2:
+                value = len(ratingsMatrix[np.where((ratingsMatrix[:,item1] >= boundry) * (ratingsMatrix[:,item2] >= boundry))])
+
+            matrix[item1, item2] = value
+
+    return normalize_matrix(matrix)
+
+def normalize_matrix(matrix : np.ndarray):
+    rows, cols = matrix.shape
+    result = np.zeros(shape=(rows, cols))
+
+    for row in range(0, rows):
+        row_sum = sum(matrix[row])
+        for col in range(0, cols):
+            if row_sum > 0:
+                result[row, col] = matrix[row, col] / row_sum
+
+    return result
+
+def to_matrix(ratings : pd.DataFrame):
+    n_users = ratings[0].max()
+    n_items = ratings[1].max()
+
+    matrix = np.zeros(shape=(n_users, n_items))
+
+    for row in ratings.itertuples(index=False):
+        user = row[0] - 1
+        item = row[1] - 1
+        rating = row[2]
+
+        matrix[user, item] = rating
+
+    return matrix
+
+
 
