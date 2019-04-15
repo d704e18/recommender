@@ -1,4 +1,5 @@
 import numpy as np
+import collections
 
 class DivRank(object):
     """
@@ -51,14 +52,11 @@ class DivRank(object):
 
                 newRanks[v] = (1 - teleport_prob) * ranks[v] + teleport_prob * sum
 
-            # TODO: Visit a node
             node = np.random.choice(nodes, 1, p=np.fromiter(ranks.values(), dtype=float))[0]
             visits[node] += 1
 
-            # TODO: if newRanks and ranks are similar = converged. No more steps!
             delta = np.linalg.norm((np.fromiter(ranks.values(), dtype=float) - np.fromiter(newRanks.values(), dtype=float)), ord=1)
 
-            print(delta)
             if delta <= epsilon:
                 return newRanks
 

@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import sys
 from .DivRank import DivRank as dr
 
 class LocalRepMF(object):
@@ -27,21 +28,70 @@ class LocalRepMF(object):
             # optimer V ved at bruge eq. 7
         raise NotImplementedError()
 
-    def growTree(self): # alg. 1
-        raise NotImplementedError()
+def growTree(ratings : pd.DataFrame,
+             V : np.ndarray,
+             users : list,
+             cand_items : list,
+             split_value : int,
+             depth : int,
+             max_depth : int,
+             user_groups = []): # alg. 1
+    best_item = None
+    best_loss = sys.maxsize
+    for item in cand_items:
+        # evaluate eq. 11
+        ratings_on_item = ratings.where([ratings[1] == item])
+        users_like = ratings.where([ratings_on_item[2] >= split_value])[0]
+        users_dislike = ratings.where([ratings_on_item[2] < split_value])[0]
 
-    def optimizeTransformationMatrices(self): # eq. 9
-        # use Maxvol to select local representatives (U2g)
-        # Learn Tg
-        raise NotImplementedError()
+        #evaluate_eq11(users_like)
 
-    def optimizeGlobalItemRepMatrix(self): # eq. 9
-        #
-        raise NotImplementedError()
+
+        loss = 0 # TODO: fix
+        if loss > best_loss:
+            best_item = item
+
+    ratings_on_item = ratings.where([ratings[1] == best_item])
+    users_like = ratings.where([ratings_on_item[2] >= split_value])[0]
+    users_dislike = ratings.where([ratings_on_item[2] < split_value])[0]
+
+    # Not a leaf node
+    if users_like != None and users_dislike != None:
+        if depth < max_depth: # TODO: fix max_depth
+            cand_items.remove(best_item) # I cand - i*
+            growTree(users_like, cand_items, split_value, depth + 1, max_depth, user_groups)
+            growTree(users_dislike, cand_items, split_value, depth + 1, max_depth, user_groups)
+            cand_items.append(best_item) # I cand + i*
+
+    # Leaf node
+    return user_groups.append(users)
+
+def evaluate_eq11(R : np.ndarray,
+                  B : np.ndarray,
+                  T : np.ndarray,
+                  V : np.ndarray,
+                  alpha : int):
+    # using frobenius norm
+    return np.square(np.linalg.norm(R - np.matmul(np.matmul(B, T), V))) + alpha * np.square(np.linalg.norm(T)) # eq. 11
+
+
+
+def optimizeTransformationMatrices(self): # eq. 9
+    # use Maxvol to select local representatives (U2g)
+    # Learn Tg
+    raise NotImplementedError()
+
+def optimizeGlobalItemRepMatrix(self): # eq. 9
+    #
+    raise NotImplementedError()
 
 def generate_candidate_items(ratings : pd.DataFrame, boundry : int):
     ratingsMatrix = to_matrix(ratings)
+    # constructing colike network
     colike_network = colike_itemitem_network(ratingsMatrix, boundry)
+
+    # employing DivRank on the network
+    return dr.rank(colike_network)
 
 def colike_itemitem_network(ratingsMatrix : np.ndarray, boundry : int):
     _, n_items = ratingsMatrix.shape
