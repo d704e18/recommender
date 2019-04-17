@@ -6,7 +6,9 @@ import pandas as pd
 
 class MatrixFactorization:  # TODO: it needs to be stochastic, or at least kinda
 
-    def fit(self, ratings, n_users, n_items, n_latent_factors: int, steps=10000, alpha=0.0002, beta=0.02):
+    def fit(self, ratings, n_latent_factors=3, steps=10000, alpha=0.0002, beta=0.02):
+        n_users = ratings['user_id'].unique().max()
+        n_items = ratings['movie_id'].unique().max()
         P = np.random.rand(n_users, n_latent_factors)
         Q = np.random.rand(n_latent_factors, n_items)
 
@@ -15,9 +17,9 @@ class MatrixFactorization:  # TODO: it needs to be stochastic, or at least kinda
         for step in range(0, steps):
             reg_error = 0
             breaker = []
-            for row in ratings.itertuples(index=False, name='row'):  # ['userId', 'movieId', 'rating', 'timestamp']
-                user = row.userId - 1
-                item = row.movieId - 1
+            for row in ratings.itertuples(index=False, name='row'):  # ['user_id', 'movie_id', 'rating', 'timestamp']
+                user = row.user_id - 1
+                item = row.movie_id - 1
                 rating = row.rating
 
                 p_u = P[user]
@@ -42,6 +44,8 @@ class MatrixFactorization:  # TODO: it needs to be stochastic, or at least kinda
                 print('BREAK')
                 break
         print('Done fitting model...')
+        self.P = P
+        self.Q = Q
         return P, Q
 
     def _compute_prediction(self, P, Q):
@@ -56,11 +60,9 @@ if __name__ == '__main__':
     ratings = pd.read_csv('../../the-movies-dataset/ratings_small.csv',
                           usecols=['userId', 'movieId', 'rating'])
     print('Done reading file...')
-    n_users = ratings['userId'].unique().max()
-    n_items = ratings['movieId'].unique().max()
 
     mat_fac = MatrixFactorization()
-    p, q = mat_fac.fit(ratings, n_users=n_users, n_items=n_items, n_latent_factors=3)
+    p, q = mat_fac.fit(ratings, n_latent_factors=3)
 
     print('Saving P and Q to .npy files')
     np.save('p', p)
