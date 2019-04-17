@@ -4,10 +4,7 @@ import urllib.request
 import zipfile
 
 import config
-import kaggle
-
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.dirname(PROJECT_ROOT)
+import recommender
 
 
 def load_dataset(args):
@@ -18,39 +15,41 @@ def load_dataset(args):
         return
 
     # Download datasets
-    ml_26m_dir = args.dir if args.dir else BASE_DIR + os.sep + 'the-movies-dataset'
+    ml_26m_dir = os.path.join(recommender.BASE_DIR, 'the-movies-dataset')
     if not os.path.exists(ml_26m_dir):
+        # import locally so users have the option to download manually
+        import kaggle
         kaggle.api.authenticate()
         kaggle.api.dataset_download_files('rounakbanik/the-movies-dataset', path=ml_26m_dir, unzip=True)
 
-    ml_1m_dir = BASE_DIR + os.sep + 'ml-1m'
+    ml_1m_dir = os.path.join(recommender.BASE_DIR, 'ml-1m')
     if not os.path.exists(ml_1m_dir):
         urllib.request.urlretrieve('http://files.grouplens.org/datasets/movielens/ml-1m.zip', ml_1m_dir + '.zip')
         zip = zipfile.ZipFile(ml_1m_dir + '.zip', 'r')
-        zip.extractall(BASE_DIR)
+        zip.extractall(recommender.BASE_DIR)
         zip.close()
 
     init_db()
 
-    cleaned_movies_path = ml_26m_dir + os.sep + 'cleaned_movies_metadata.csv'
-    preprocess_movies(ml_26m_dir + os.sep + 'movies_metadata.csv', cleaned_movies_path, ml_26m_dir + os.sep +
-                      'links.csv', ml_26m_dir + os.sep + 'credits.csv')
+    cleaned_movies_path = os.path.join(ml_26m_dir, 'cleaned_movies_metadata.csv')
+    preprocess_movies(os.path.join(ml_26m_dir, 'movies_metadata.csv'), cleaned_movies_path, os.path.join(ml_26m_dir,
+                      'links.csv'), os.path.join(ml_26m_dir, 'credits.csv'))
 
     load_movies(cleaned_movies_path)
 
     # Load ratings
     if args.dataset == 'ml-26m':
-        load_ratings(ml_26m_dir + os.sep + 'ratings.csv')
+        load_ratings(os.path.join(ml_26m_dir, 'ratings.csv'))
         mlds = MovieLensDS(l_from='db', use_ml_1m=False)
         mlds.extend_item_attributes()
         mlds.to_pkl(items_path='moviestmd.pkl', users_path='users26m.pkl', ratings_path='ratings26m.pkl')
     elif args.dataset == 'ml-1m':
-        load_ratings(ml_26m_dir + os.sep + 'ratings_small.csv')
+        load_ratings(os.path.join(ml_26m_dir, 'ratings_small.csv'))
         mlds = MovieLensDS(l_from='db', use_ml_1m=True)
         mlds.extend_item_attributes()
         mlds.to_pkl(items_path='movies1m.pkl', users_path='users1m.pkl', ratings_path='ratings1m.pkl')
     elif args.dataset == 'ml-100k':
-        load_ratings(ml_26m_dir + os.sep + 'ratings_small.csv')
+        load_ratings(os.path.join(ml_26m_dir, 'ratings_small.csv'))
         mlds = MovieLensDS(l_from='db', use_ml_1m=False)
         mlds.extend_item_attributes()
         mlds.to_pkl(items_path='moviestmd.pkl', users_path='users100k.pkl', ratings_path='ratings100k.pkl')
@@ -94,20 +93,18 @@ if __name__ == '__main__':
 
     # Parser arguments
     parser.add_argument('--config', default='LOCAL',
-                        help='Configurations to use.')
-    subparsers = parser.add_subparsers(help='Sub-command help')
+                        help='configurations to use')
+    subparsers = parser.add_subparsers(help='sub-command help')
 
     # Load dataset parser
-    load_ds_parser = subparsers.add_parser('load_dataset', help='Load dataset into database.')
-    load_ds_parser.add_argument('--dir', nargs='?',
-                                help='Directory where the dataset is located.')
-    load_ds_parser.add_argument('dataset', choices=['ml-26m', 'ml-1m', 'ml-100k'])
+    load_ds_parser = subparsers.add_parser('load_dataset', help='load dataset into database')
+    load_ds_parser.add_argument('dataset', choices=['ml-26m', 'ml-1m', 'ml-100k'], help='the dataset choices')
     load_ds_parser.set_defaults(func=load_dataset)
 
     # Algorithm parser
-    alg_parser = subparsers.add_parser('alg', help='Run recommender algorithms')
-    alg_parser.add_argument('algorithm', choices=['mfnonvec'])
-    alg_parser.add_argument('dataset', choices=['ml-26m', 'ml-1m', 'ml-100k'])
+    alg_parser = subparsers.add_parser('alg', help='run recommender algorithms')
+    alg_parser.add_argument('algorithm', choices=['mfnonvec'], help='the recommender algorithm to run')
+    alg_parser.add_argument('dataset', choices=['ml-26m', 'ml-1m', 'ml-100k'], help='the dataset to use')
     alg_parser.set_defaults(func=run_algorithm)
 
     # Parse args and load configs

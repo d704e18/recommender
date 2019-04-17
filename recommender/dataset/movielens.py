@@ -3,24 +3,24 @@ from datetime import datetime
 
 import pandas as pd
 
-import main
+import recommender
 from ratings.database import engine
 
 
 class MovieLensDS(object):
 
-    def __init__(self, l_from='pkl', ml_dir_path=main.BASE_DIR + os.sep + 'ml-1m',
+    def __init__(self, l_from='pkl', ml_dir_path=os.path.join(recommender.BASE_DIR, 'ml-1m'),
                  use_ml_1m=True, pkl_files=('movies.pkl', 'users.pkl', 'ratings.pkl')):
         if l_from == 'db':
             connection = engine.connect()
             self.items = pd.read_sql_table('movies', connection)
             self.items = self.items.rename(columns={'id': 'movie_id'})
             if use_ml_1m:  # Only use items present in both Movie Lens 1M and db
-                self.ratings = pd.read_csv(ml_dir_path + os.sep + 'ratings.dat', sep='::', engine='python',
+                self.ratings = pd.read_csv(os.path.join(ml_dir_path, 'ratings.dat'), sep='::', engine='python',
                                            names=['user_id', 'movie_id', 'rating', 'timestamp'])
-                self.users = pd.read_csv(ml_dir_path + os.sep + 'users.dat', sep='::', engine='python',
+                self.users = pd.read_csv(os.path.join(ml_dir_path, 'users.dat'), sep='::', engine='python',
                                          names=['user_id', 'gender', 'age', 'occupation', 'zip_code'])
-                self.movies_ml = pd.read_csv(ml_dir_path + os.sep + 'movies.dat', sep='::', engine='python',
+                self.movies_ml = pd.read_csv(os.path.join(ml_dir_path, 'movies.dat'), sep='::', engine='python',
                                              names=['movie_id', 'title', 'genre'], usecols=['movie_id'])
                 self.items = self.movies_ml.merge(self.items, how='inner', on='movie_id')
             else:
