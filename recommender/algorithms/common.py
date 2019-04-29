@@ -33,7 +33,6 @@ class Recommender(object):
         jaccard_sim_matrix = pairwise_distances(features, metric='jaccard', n_jobs=n_jobs)
         return 1 - jaccard_sim_matrix
 
-
     def combine_similarity_matrices(self, sim_matrices, weights=None):
         """Combine similarity matrices into one similarity matrix."""
         return np.average(sim_matrices, axis=0, weights=weights)
@@ -53,15 +52,16 @@ class Recommender(object):
 
         return user_average_ratings
 
-    def mean_average_precision(self, rating_df, average_rating_df):
+    def mean_average_precision(self, rating_df=None):
+        if rating_df is None:
+            rating_df = self.dataset.ratings
         list_of_ap = []
+        average_rating_df = self.user_average_ratings(rating_df)
         for user in rating_df.user_id.unique():
             average_rating = average_rating_df.rating.loc[average_rating_df['user_id'] == user].iloc[0]
 
             good_recommendations = rating_df.loc[rating_df.user_id == user]
             good_recommendations = good_recommendations[good_recommendations.rating >= average_rating].movie_id
-
-            n_recommendations_needed = good_recommendations.size
 
             top_n_recommendations = [x[0] for x in self.top_n(n=10, user=user)]
 
@@ -82,3 +82,9 @@ class Recommender(object):
             list_of_ap.append(score)
 
         return np.mean(list_of_ap)
+
+    def save_model(self, dataset):
+        return NotImplementedError('Implement in subclasses.')
+
+    def load_model(self, path):
+        return NotImplementedError('Implement in subclasses.')
