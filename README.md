@@ -43,13 +43,17 @@ optional arguments:
 ```
 Running algorithms:
 ```
-usage: recommender alg [-h] {mfnonvec} {ml-26m,ml-1m,ml-100k}
+usage: __main__.py alg [-h] [-s] [-l LOAD]
+                       {mfnonvec,mp} {ml-26m,ml-1m,ml-100k} {map} [{map} ...]
 
 positional arguments:
-  {mfnonvec}            the recommender algorithm to run
+  {mfnonvec,mp}         the recommender algorithm to run
   {ml-26m,ml-1m,ml-100k}
                         the dataset to use
+  {map}                 Evaluation methods
 
 optional arguments:
   -h, --help            show this help message and exit
+  -s, --save            save the model for later use
+  -l LOAD, --load LOAD  load model from given directory
   ```
