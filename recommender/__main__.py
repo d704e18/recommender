@@ -131,7 +131,7 @@ if __name__ == '__main__':
     import config
     config.set_settings(args.config)
     # Import after the configurations are set.
-    from algorithms.matrix_factorization.matrix_factorization_nonVec import MatrixFactorization as MFNonVec
+    from algorithms.matrix_factorization_nonVec import MatrixFactorization as MFNonVec
     from algorithms.mostpopular import MostPopular
     from dataset.movielens import MovieLensDS
     from ratings.database import init_db
