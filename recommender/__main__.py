@@ -1,10 +1,8 @@
 import argparse
 import os
+import sys
 import urllib.request
 import zipfile
-
-import config
-import recommender
 
 
 def load_dataset(args):
@@ -80,12 +78,23 @@ def run_algorithm(args):
         }
     }
     algorithms = {
-        'mfnonvec': MFNonVec()
+        'mfnonvec': MFNonVec,
+        'mp': MostPopular
     }
     dataset_info = datasets.get(args.dataset)
     dataset = dataset_info['class'](**dataset_info['params'])
-    algorithm = algorithms.get(args.algorithm)
-    algorithm.fit(dataset.ratings)
+    algorithm = algorithms.get(args.algorithm)(dataset)
+    if args.load:
+        algorithm.load_model(args.load)
+    else:
+        algorithm.fit(dataset.ratings)
+    if args.save and not args.load:
+        algorithm.save_model(args.dataset)
+    for eval in args.evaluation:
+        res = None
+        if eval == 'map':
+            res = algorithm.mean_average_precision()
+        print(f'{args.algorithm} {eval}: {res}')
 
 
 if __name__ == '__main__':
@@ -103,15 +112,27 @@ if __name__ == '__main__':
 
     # Algorithm parser
     alg_parser = subparsers.add_parser('alg', help='run recommender algorithms')
-    alg_parser.add_argument('algorithm', choices=['mfnonvec'], help='the recommender algorithm to run')
+    alg_parser.add_argument('algorithm', choices=['mfnonvec', 'mp'], help='the recommender algorithm to run')
     alg_parser.add_argument('dataset', choices=['ml-26m', 'ml-1m', 'ml-100k'], help='the dataset to use')
+    alg_parser.add_argument('evaluation', nargs='+', choices=['map'], help='Evaluation methods')
+    alg_parser.add_argument('-s', '--save', action='store_true', help='save the model for later use')
+    alg_parser.add_argument('-l', '--load', help='load model from given directory')
     alg_parser.set_defaults(func=run_algorithm)
 
-    # Parse args and load configs
+    # Parse args
     args = parser.parse_args()
+
+    # Add content root to pythonpath
+    this_dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.extend([this_dir, os.path.dirname(this_dir)])
+
+    # Load configs
+    import recommender
+    import config
     config.set_settings(args.config)
     # Import after the configurations are set.
-    from algorithms.matrix_factorization.matrix_factorization_nonVec import MatrixFactorization as MFNonVec
+    from algorithms.matrix_factorization_nonVec import MatrixFactorization as MFNonVec
+    from algorithms.mostpopular import MostPopular
     from dataset.movielens import MovieLensDS
     from ratings.database import init_db
     from ratings.commands.load_movies_dataset import load_movies, load_ratings
