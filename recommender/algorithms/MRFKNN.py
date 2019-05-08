@@ -15,8 +15,9 @@ class KNN:
         self.categories = None
         self.naive = naive
         if categories:
-            self.features = df.drop(categories, axis=1)
-            self.categories = df[categories]
+            self.features = df.drop(df.loc[:, df.dtypes == bool], axis=1)
+            self.categories = df.loc[:, df.dtypes == bool]
+
 
     def add_element(self, element):
         """
