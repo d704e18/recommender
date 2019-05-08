@@ -13,35 +13,52 @@ def transform_ratings(pure_ratings: pd.DataFrame):
     grouped_users = pure_ratings.groupby('user_id')
     user_keys = pure_ratings['user_id'].unique()
     for key in user_keys:
-        user_movies[key] = (list(grouped_users.get_group(key)['movie_id']))
+        user_movies[key-1] = (list(grouped_users.get_group(key)['movie_id']))
 
     movie_users = {}
     grouped_movies = pure_ratings.groupby('movie_id')
     movie_keys = pure_ratings['movie_id'].unique()
     for key in movie_keys:
-        movie_users[key] = (list(grouped_movies.get_group(key)['user_id']))
+        movie_users[key-1] = (list(grouped_movies.get_group(key)['user_id']))
 
     print(pure_ratings.head())
 
     return user_movies, movie_users, pure_ratings.drop('timestamp', axis=1)
 
 
+def one_hot_user(df):
+    one_hot_gender = pd.get_dummies(df['gender'])
+    one_hot_gender.drop('M', inplace=True, axis=1)
+    one_hot_occupation = pd.get_dummies(df['occupation'])
+
+
+    return pd.concat([one_hot_gender, one_hot_occupation], axis=1)
+
 if __name__ == "__main__":
     generator = MovieLensDS()
-    user_ratings = transform_ratings(generator.ratings)
+    ratings = transform_ratings(generator.ratings)
 
     hyperParams = (2, 5, 2)
 
-    u_features = np.array([[5, 1],
-                           [2, 3],
-                           [4, 0],
-                           [4, 1]])
-    i_features = np.array([[8, 2],
-                           [2, 2],
-                           [4, 4],
-                           [4, 0]])
+    generator.items.drop(generator.items.iloc[:, 33:], inplace=True, axis=1)
+    generator.items.drop(generator.items.iloc[:, 1:14], inplace=True, axis=1)
+    wat = generator.items.columns.values
+
+
+
+
+    print(generator.users.head())
+    print(generator.users.shape)
+    print(generator.items.head())
+    print(generator.items.shape)
+
+    u_features = one_hot_user(generator.users)
+    i_features = generator.items
+
+    print(u_features.head())
+    print(u_features.shape)
 
     mk = MarkovRandomFieldPrior()
-    # mk.fit(observed_ratings, u_features, i_features, hyperParams, 10)
+    mk.fit(ratings, u_features, i_features, hyperParams, 10)
 
     print("Yay Done")
