@@ -1,4 +1,3 @@
-print('rewrew')
 import pandas as pd
 from functools import partial
 from pathlib import Path
