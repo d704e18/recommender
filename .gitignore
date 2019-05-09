@@ -116,3 +116,6 @@ recommender/database.sqlite3
 
 # dataset
 ml-100k/
+
+# generated data
+data/
