@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 from algorithms.MRFKNN import KNN
 
-
 class MarkovRandomFieldPrior:
     """
     Implementation of the paper: N-dimensional Markov random filed prior for cold-start recommendation
@@ -36,7 +35,9 @@ class MarkovRandomFieldPrior:
         _, self.knn_indexes_items, self.knn_euclidians_items = self.computeKNN(item_features.drop('movie_id', axis=1), True, k)
         print("user knn")
         _, self.knn_indexes_users, self.knn_euclidians_users = self.computeKNN(user_features, True, k)
-
+        
+        self.knn_idx_users = {i: np.argwhere(self.knn_indexes_users == i) for i in range(N)}
+        self.knn_idx_items = {i: np.argwhere(self.knn_indexes_items == i) for i in range(M)}
 
 
 
@@ -57,12 +58,12 @@ class MarkovRandomFieldPrior:
 
         if with_respect_to == "user":
             current_latents = self.users_latentProfile[i]
-            knn_idxs = np.argwhere(self.knn_indexes_users == i)
+            knn_idxs = self.knn_idx_users[i]
             euclidians = self.knn_euclidians_users[knn_idxs] # euclidians where i is a neighbour of p
             latents = self.items_latentProfile[self._observed_ratings_users[i]]
         else:
             current_latents = self.items_latentProfile[i]
-            knn_idxs = np.argwhere(self.knn_indexes_items == i)
+            knn_idxs = self.knn_idx_items[i]
             euclidians = self.knn_euclidians_items[knn_idxs] # euclidians where i is a neighbour of p
             latents = self.users_latentProfile[self._observed_ratings_items[i]]
 
@@ -75,7 +76,7 @@ class MarkovRandomFieldPrior:
             other_latents = self.items_latentProfile[self._observed_ratings_users[i]]  #  latents for items rated by user i
             ratings = self._observed_ratings[self._observed_ratings['user_id'] == i, 'rating']  # ratings
 
-            IneP_idx = np.argwhere(self.knn_indexes_users == i)  # where i is a neighbour of p
+            IneP_idx = self.knn_idx_users[i]  # where i is a neighbour of p
             IneP_euclidians = self.knn_euclidians_users[IneP_idx]  # euclid's where i is a neighbour of p
             IneP_latents = self.users_latentProfile[IneP_idx] #TODO this probably wont worke since idx is 2-d
             
