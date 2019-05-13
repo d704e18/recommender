@@ -36,8 +36,8 @@ class MarkovRandomFieldPrior:
         print("user knn")
         _, self.knn_indexes_users, self.knn_euclidians_users = self.computeKNN(user_features, True, k)
         
-        self.knn_idx_users = {i: np.argwhere(self.knn_indexes_users == i) for i in range(N)}
-        self.knn_idx_items = {i: np.argwhere(self.knn_indexes_items == i) for i in range(M)}
+        self.IneP_users = {i: np.argwhere(self.knn_indexes_users == i) for i in range(N)}
+        self.IneP_items = {i: np.argwhere(self.knn_indexes_items == i) for i in range(M)}
 
 
 
@@ -61,12 +61,12 @@ class MarkovRandomFieldPrior:
 
         if with_respect_to == "user":
             current_latents = self.users_latentProfile[i]
-            knn_idxs = np.where(self.knn_indexes_users == i)
+            knn_idxs = self.IneP_users[i]
             euclidians = self.knn_euclidians_users[knn_idxs] # euclidians where i is a neighbour of p
             latents = self.items_latentProfile[self._observed_ratings_users[i]]
         else:
             current_latents = self.items_latentProfile[i]
-            knn_idxs = np.where(self.knn_indexes_items == i)
+            knn_idxs = self.IneP_items[i]
             euclidians = self.knn_euclidians_items[knn_idxs] # euclidians where i is a neighbour of p
             latents = self.users_latentProfile[self._observed_ratings_items[i]]
 
@@ -81,7 +81,7 @@ class MarkovRandomFieldPrior:
             other_latents = self.items_latentProfile[self._observed_ratings_users[i]]  #  latents for items rated by user i
             ratings = self._observed_ratings.loc[self._observed_ratings['user_id'] == i, 'rating']  # ratings
 
-            IneP_idx = np.where(self.knn_indexes_users == i)  # where i is a neighbour of p
+            IneP_idx = self.IneP_users[i]  # where i is a neighbour of p
             IneP_euclidians = self.knn_euclidians_users[IneP_idx].reshape(-1,1)  # euclid's where i is a neighbour of p
             IneP_latents = self.users_latentProfile[IneP_idx[0]] # latents where i is a neighbour of p
             
@@ -93,7 +93,7 @@ class MarkovRandomFieldPrior:
             other_latents = self.users_latentProfile[self._observed_ratings_items[i]]  # latents for items rated by user i
             ratings = self._observed_ratings.loc[self._observed_ratings['movie_id'] == i, 'rating']  # ratings
 
-            IneP_idx = np.where(self.knn_indexes_items == i)  # where i is a neighbour of p
+            IneP_idx = self.IneP_items[i]  # where i is a neighbour of p
             IneP_euclidians = self.knn_euclidians_items[IneP_idx].reshape(-1, 1)  # euclid's where i is a neighbour of p
             IneP_latents = self.items_latentProfile[IneP_idx[0]]  # latents where i is a neighbour of p
 
