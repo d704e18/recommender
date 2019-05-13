@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 from algorithms.MRFKNN import KNN
 
-
 class MarkovRandomFieldPrior:
     """
     Implementation of the paper: N-dimensional Markov random filed prior for cold-start recommendation
@@ -36,7 +35,9 @@ class MarkovRandomFieldPrior:
         _, self.knn_indexes_items, self.knn_euclidians_items = self.computeKNN(item_features.drop('movie_id', axis=1), True, k)
         print("user knn")
         _, self.knn_indexes_users, self.knn_euclidians_users = self.computeKNN(user_features, True, k)
-
+        
+        self.knn_idx_users = {i: np.argwhere(self.knn_indexes_users == i) for i in range(N)}
+        self.knn_idx_items = {i: np.argwhere(self.knn_indexes_items == i) for i in range(M)}
 
 
 
