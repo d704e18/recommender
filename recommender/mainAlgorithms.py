@@ -10,18 +10,23 @@ from dataset.movielens import MovieLensDS
 def transform_ratings(pure_ratings: pd.DataFrame):
     user_movies = {}
 
-    grouped_users = pure_ratings.groupby('user_id')
-    user_keys = pure_ratings['user_id'].unique()
-    for key in user_keys:
-        user_movies[key-1] = (list(grouped_users.get_group(key)['movie_id']))
-
     movie_users = {}
     grouped_movies = pure_ratings.groupby('movie_id')
     movie_keys = pure_ratings['movie_id'].unique()
-    for key in movie_keys:
-        movie_users[key-1] = (list(grouped_movies.get_group(key)['user_id']))
+
+    grouped_users = pure_ratings.groupby('user_id')
+    user_keys = pure_ratings['user_id'].unique()
+
+    for key in user_keys:
+        user_movies[key-1] = np.where(np.isin(movie_keys, grouped_users.get_group(key)['movie_id']))
+
+    for i, key in enumerate(movie_keys):
+        movie_users[i] = (np.array(grouped_movies.get_group(key)['user_id'])-1).tolist()
 
     print(pure_ratings.head())
+
+    pure_ratings['user_id'] = pure_ratings['user_id'] - 1
+    pure_ratings['movie_id'] = np.where(np.isin(movie_keys, pure_ratings['movie_id']))
 
     return user_movies, movie_users, pure_ratings.drop('timestamp', axis=1)
 
