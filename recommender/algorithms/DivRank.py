@@ -9,7 +9,7 @@ class DivRank(object):
         Url: https://dl.acm.org/citation.cfm?id=1835931
     """
 
-    def rank(network : np.ndarray, steps = 10000, teleport_prob : int = 0.9, follow_link_prob : int = 0.25, epsilon : int = 0.001):
+    def rank(network : np.ndarray, steps = 100, teleport_prob : int = 0.9, follow_link_prob : int = 0.25, epsilon : int = 0.001):
         # teleport_prob is lambda in paper
         # follow_link_prob is alpha in paper
         _, n_vertices = network.shape
