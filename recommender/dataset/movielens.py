@@ -10,7 +10,7 @@ from ratings.database import engine
 class MovieLensDS(object):
 
     def __init__(self, l_from='pkl', ml_dir_path=main.BASE_DIR + os.sep + 'ml-1m',
-                 use_ml_1m=True, pkl_files=('movies.pkl', 'users.pkl', 'ratings.pkl')):
+                 use_ml_1m=True, pkl_files=('movies1m.pkl', 'users1m.pkl', 'ratings1m.pkl')):
         if l_from == 'db':
             connection = engine.connect()
             self.items = pd.read_sql_table('movies', connection)

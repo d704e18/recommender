@@ -2,31 +2,42 @@ from algorithms.MarkovRandomFieldPrior import MarkovRandomFieldPrior
 
 import numpy as np
 import pandas as pd
+import os
 import config
+from time import time
 config.set_settings('LOCAL')
 from dataset.movielens import MovieLensDS
 
 
-def transform_ratings(pure_ratings: pd.DataFrame):
+def transform_ratings(pure_ratings: pd.DataFrame, item_features, user_features):
+
+    # First, drop items not in both sets
+    pure_ratings = pure_ratings[pure_ratings['movie_id'].isin(item_features['movie_id'])]
+    item_features = item_features[item_features['movie_id'].isin(pure_ratings['movie_id'])]
+
+    # Also 0 index user_id
+    pure_ratings['user_id'] = pure_ratings['user_id']-1
+
+    # Convert to 0 indexed items
+    item_id_conversion = item_features['movie_id']
+    pure_ratings['movie_id'].replace(list(item_id_conversion), list(np.arange(len(item_id_conversion))), inplace=True)
+
+    # Construct movie rated by user collection and user rated movie collection
+    grouped_movies = pure_ratings.groupby('movie_id')
+    grouped_users = pure_ratings.groupby('user_id')
+
+
     user_movies = {}
+    for key in pure_ratings['user_id'].unique():
+        user_movies[key] = list(grouped_users.get_group(key)['movie_id'])
+
 
     movie_users = {}
-    grouped_movies = pure_ratings.groupby('movie_id')
-    movie_keys = pure_ratings['movie_id'].unique()
-
-    grouped_users = pure_ratings.groupby('user_id')
-    user_keys = pure_ratings['user_id'].unique()
-
-    for key in user_keys:
-        user_movies[key-1] = np.where(np.isin(movie_keys, grouped_users.get_group(key)['movie_id']))
-
-    for i, key in enumerate(movie_keys):
-        movie_users[i] = (np.array(grouped_movies.get_group(key)['user_id'])-1).tolist()
+    for key in pure_ratings['movie_id'].unique():
+        movie_users[key] = list(grouped_movies.get_group(key)['user_id'])
 
     print(pure_ratings.head())
 
-    pure_ratings['user_id'] = pure_ratings['user_id'] - 1
-    pure_ratings['movie_id'] = np.where(np.isin(movie_keys, pure_ratings['movie_id']))
 
     return user_movies, movie_users, pure_ratings.drop('timestamp', axis=1)
 
@@ -40,30 +51,30 @@ def one_hot_user(df):
     return pd.concat([one_hot_gender, one_hot_occupation], axis=1)
 
 if __name__ == "__main__":
+    start = time()
     generator = MovieLensDS()
-    ratings = transform_ratings(generator.ratings)
+    end = time()
+
+    print("Time: {}".format(end-start))
+
 
     hyperParams = (2, 5, 2)
 
     generator.items.drop(generator.items.iloc[:, 33:], inplace=True, axis=1)
     generator.items.drop(generator.items.iloc[:, 1:14], inplace=True, axis=1)
-    wat = generator.items.columns.values
+    generator.users.drop('gender_M', inplace=True, axis=1)
 
-
-
-
+    ratings = transform_ratings(generator.ratings, generator.items, generator.users)
     print(generator.users.head())
     print(generator.users.shape)
     print(generator.items.head())
     print(generator.items.shape)
 
-    u_features = one_hot_user(generator.users)
-    i_features = generator.items
 
-    print(u_features.head())
-    print(u_features.shape)
+    item_features = generator.items
+    user_features = generator.users
 
     mk = MarkovRandomFieldPrior()
-    mk.fit(ratings, u_features, i_features, hyperParams, 10)
+    mk.fit(ratings, user_features, item_features, hyperParams, 10, os.getcwd()+"/data")
 
     print("Yay Done")
