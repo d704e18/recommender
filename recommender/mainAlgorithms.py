@@ -58,7 +58,7 @@ if __name__ == "__main__":
     print("Time: {}".format(end-start))
 
 
-    hyperParams = (2, 5, 2)
+    hyperParams = (2, 2, 2)
 
     generator.items.drop(generator.items.iloc[:, 33:], inplace=True, axis=1)
     generator.items.drop(generator.items.iloc[:, 1:14], inplace=True, axis=1)

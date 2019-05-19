@@ -55,14 +55,18 @@ class MarkovRandomFieldPrior:
 
         for i in range(0, n_iter):
             for n in range(0, N):
-                self.users_latentProfile[n] = self._compute_A(n, alpha, k, "user") \
-                                              - 1 * self._compute_B(n, alpha, k, "user")
+                a_user = self._compute_A(n, alpha, k, "user")
+                b_user = 1 * self._compute_B(n, alpha, k, "user")
+                self.users_latentProfile[n] = a_user - b_user
             print("Iter: {} User latents updated".format(i))
 
             for m in range(0, M_rated_items):
-                self.items_latentProfile[m] = self._compute_A(m, alpha, k, "items") \
-                                              - 1 * self._compute_B(m, alpha, k, "items")
+                a_item = self._compute_A(m, alpha, k, "items")
+                b_item = 1 * self._compute_B(m, alpha, k, "items")
+                self.items_latentProfile[m] = a_item - b_item
             print("Iter: {} item latents updated".format(i))
+
+        return self.users_latentProfile, self.items_latentProfile
 
     def computeKNN(self, features, categories, k):
         knn_computer = KNN(features, categories)
@@ -73,16 +77,20 @@ class MarkovRandomFieldPrior:
 
         if with_respect_to == "user":
             current_latents = self.users_latentProfile[i]
-            knn_idxs = self.IneP_users[i]
-            euclidians = self.knn_euclidians_users[knn_idxs] # euclidians where i is a neighbour of p
+            n_IneP = self.IneP_users[i][0].size  # Amount of times i is a neighbour
             latents = self.items_latentProfile[self._observed_ratings_users[i]]
+
+            knn_idxs = self.IneP_users[i]
+            euclidians = self.knn_euclidians_users[knn_idxs]  # euclidians where i is a neighbour of p
         else:
             current_latents = self.items_latentProfile[i]
-            knn_idxs = self.IneP_items[i]
-            euclidians = self.knn_euclidians_items[knn_idxs] # euclidians where i is a neighbour of p
+            n_IneP = self.IneP_items[i][0].size  # Amount of times i is a neighbour
             latents = self.users_latentProfile[self._observed_ratings_items[i]]
 
-        res = np.sum(np.dot(latents, np.transpose(latents))) + alpha*current_latents*(1+np.divide(np.sum(euclidians)**2, k**2))
+            knn_idxs = self.IneP_items[i]
+            euclidians = self.knn_euclidians_items[knn_idxs]  # euclidians where i is a neighbour of p
+
+        res = np.sum(np.dot(np.transpose(latents), latents), axis=0) + alpha*current_latents*(1+np.divide(n_IneP**2, k**2))
 
         return res
 
@@ -94,11 +102,10 @@ class MarkovRandomFieldPrior:
             ratings = self._observed_ratings.loc[self._observed_ratings['user_id'] == i, 'rating']  # ratings
 
             IneP_idx = self.IneP_users[i]  # where i is a neighbour of p
-            IneP_euclidians = self.knn_euclidians_users[IneP_idx].reshape(-1,1)  # euclid's where i is a neighbour of p
             IneP_latents = self.users_latentProfile[IneP_idx[0]] # latents where i is a neighbour of p
+            b3_in = np.array([np.sum(self.users_latentProfile[self.IneP_users[k][0]], axis=0) for k in IneP_idx[0]])
             
             PneI_idx = self.knn_indexes_users[i]  # where p is a neighbour of i
-            PneI_euclidians = self.knn_euclidians_users[i].reshape(-1,1)  # euclid's where p is a neighbour of i
             PneI_latents = self.users_latentProfile[PneI_idx]  # latents where p is a neighbour of i
         else:
             this_latents = self.items_latentProfile[i]  # latents for user i
@@ -106,16 +113,16 @@ class MarkovRandomFieldPrior:
             ratings = self._observed_ratings.loc[self._observed_ratings['movie_id'] == i, 'rating']  # ratings
 
             IneP_idx = self.IneP_items[i]  # where i is a neighbour of p
-            IneP_euclidians = self.knn_euclidians_items[IneP_idx].reshape(-1, 1)  # euclid's where i is a neighbour of p
             IneP_latents = self.items_latentProfile[IneP_idx[0]]  # latents where i is a neighbour of p
+            b3_in = np.array([np.sum(self.items_latentProfile[self.IneP_items[k][0]], axis=0) for k in IneP_idx[0]])
 
             PneI_idx = self.knn_indexes_items[i]  # where p is a neighbour of i
-            PneI_euclidians = self.knn_euclidians_items[i].reshape(-1, 1)  # euclid's where p is a neighbour of i
             PneI_latents = self.items_latentProfile[PneI_idx]  # latents where p is a neighbour of i
 
-        b_1 = np.sum(other_latents*ratings.values.reshape(-1, 1))
-        b_2 = alpha*np.divide(np.sum(PneI_euclidians*PneI_latents)+np.sum(IneP_euclidians*PneI_latents), k)
-        b_3 = alpha*np.divide(np.sum(this_latents   IneP_euclidians), k**2)
+        b_1 = np.sum(other_latents*ratings.values.reshape(-1, 1), axis=0)
+        b_2 = alpha*np.divide(np.sum(PneI_latents, axis=0)+np.sum(IneP_latents, axis=0), k)
+        b3_in = b3_in[b3_in.all(axis=1)]-this_latents if b3_in.size > 0 else [0]
+        b_3 = alpha*np.divide(np.sum(b3_in, axis=0), k**2)
 
         return b_1+b_2-b_3
 
