@@ -37,33 +37,40 @@ class MarkovRandomFieldPrior:
 
         if knn_precomputed_path is not None:
             print("Loading pre-computed knn")
-            self.knn_indexes_items = np.load(knn_precomputed_path+"/knn_indexes_items.npy")
-            self.knn_indexes_users = np.load(knn_precomputed_path+"/knn_indexes_users.npy")
-            self.knn_euclidians_items = np.load(knn_precomputed_path+"/knn_euclidians_items.npy")
-            self.knn_euclidians_users = np.load(knn_precomputed_path+"/knn_euclidians_users.npy")
+            self.knn_indexes_items = np.load(knn_precomputed_path+"/knn_indexes_items10.npy")[:, :k]
+            self.knn_indexes_users = np.load(knn_precomputed_path+"/knn_indexes_users10.npy")[:, :k]
+            self.knn_euclidians_items = np.load(knn_precomputed_path+"/knn_euclidians_items10.npy")[:, :k]
+            self.knn_euclidians_users = np.load(knn_precomputed_path+"/knn_euclidians_users10.npy")[:, :k]
         else:
             print("computing item knn")
             _, self.knn_indexes_items, self.knn_euclidians_items = self.computeKNN(item_features.drop('movie_id', axis=1), True, k)
             print("computing user knn")
             _, self.knn_indexes_users, self.knn_euclidians_users = self.computeKNN(user_features.drop(['zip_code', 'user_id'], axis=1), True, k)
 
-        
         self.IneP_users = {i: np.where(self.knn_indexes_users == i) for i in range(N)}
         self.IneP_items = {i: np.where(self.knn_indexes_items == i) for i in range(M)}
 
 
 
+
         for i in range(0, n_iter):
+
+            temp_user_latentProfile = np.zeros((N, d))
             for n in range(0, N):
                 a_user = self._compute_A(n, alpha, k, "user")
                 b_user = 1 * self._compute_B(n, alpha, k, "user")
-                self.users_latentProfile[n] = a_user - b_user
+                temp_user_latentProfile[n] = a_user - b_user
+
+            self.users_latentProfile = temp_user_latentProfile
             print("Iter: {} User latents updated".format(i))
 
+            temp_items_latentProfile = np.zeros((M, d))
             for m in range(0, M_rated_items):
                 a_item = self._compute_A(m, alpha, k, "items")
                 b_item = 1 * self._compute_B(m, alpha, k, "items")
-                self.items_latentProfile[m] = a_item - b_item
+                temp_items_latentProfile[m] = a_item - b_item
+
+            self.items_latentProfile = temp_items_latentProfile
             print("Iter: {} item latents updated".format(i))
 
         return self.users_latentProfile, self.items_latentProfile
@@ -103,10 +110,13 @@ class MarkovRandomFieldPrior:
 
             IneP_idx = self.IneP_users[i]  # where i is a neighbour of p
             IneP_latents = self.users_latentProfile[IneP_idx[0]] # latents where i is a neighbour of p
-            b3_in = np.array([np.sum(self.users_latentProfile[self.IneP_users[k][0]], axis=0) for k in IneP_idx[0]])
+
             
             PneI_idx = self.knn_indexes_users[i]  # where p is a neighbour of i
             PneI_latents = self.users_latentProfile[PneI_idx]  # latents where p is a neighbour of i
+
+            b3_in = np.array([np.sum(self.users_latentProfile[self.knn_indexes_users[k]], axis=0) for k in PneI_idx])
+            #b3_in = np.array([np.sum(self.users_latentProfile[self.IneP_users[k][0]], axis=0) for k in IneP_idx[0]])
         else:
             this_latents = self.items_latentProfile[i]  # latents for user i
             other_latents = self.users_latentProfile[self._observed_ratings_items[i]]  # latents for items rated by user i
@@ -114,10 +124,12 @@ class MarkovRandomFieldPrior:
 
             IneP_idx = self.IneP_items[i]  # where i is a neighbour of p
             IneP_latents = self.items_latentProfile[IneP_idx[0]]  # latents where i is a neighbour of p
-            b3_in = np.array([np.sum(self.items_latentProfile[self.IneP_items[k][0]], axis=0) for k in IneP_idx[0]])
 
             PneI_idx = self.knn_indexes_items[i]  # where p is a neighbour of i
             PneI_latents = self.items_latentProfile[PneI_idx]  # latents where p is a neighbour of i
+
+            b3_in = np.array([np.sum(self.items_latentProfile[self.knn_indexes_items[k]], axis=0) for k in PneI_idx])
+            #b3_in = np.array([np.sum(self.items_latentProfile[self.IneP_items[k][0]], axis=0) for k in IneP_idx[0]])
 
         b_1 = np.sum(other_latents*ratings.values.reshape(-1, 1), axis=0)
         b_2 = alpha*np.divide(np.sum(PneI_latents, axis=0)+np.sum(IneP_latents, axis=0), k)

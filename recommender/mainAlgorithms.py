@@ -57,8 +57,12 @@ if __name__ == "__main__":
 
     print("Time: {}".format(end-start))
 
+    alpha = 0
+    d = 2
+    k = 10
 
-    hyperParams = (2, 2, 2)
+
+    hyperParams = (alpha, d, k)
 
     generator.items.drop(generator.items.iloc[:, 33:], inplace=True, axis=1)
     generator.items.drop(generator.items.iloc[:, 1:14], inplace=True, axis=1)
@@ -74,7 +78,9 @@ if __name__ == "__main__":
     item_features = generator.items
     user_features = generator.users
 
+    path = os.getcwd()+"/data"
+
     mk = MarkovRandomFieldPrior()
-    mk.fit(ratings, user_features, item_features, hyperParams, 10, os.getcwd()+"/data")
+    mk.fit(ratings, user_features, item_features, hyperParams, 10, path)
 
     print("Yay Done")
