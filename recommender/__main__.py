@@ -79,7 +79,8 @@ def run_algorithm(args):
     }
     algorithms = {
         'mfnonvec': MFNonVec,
-        'mp': MostPopular
+        'mp': MostPopular,
+        'mp2': MostPopular2
     }
     dataset_info = datasets.get(args.dataset)
     dataset = dataset_info['class'](**dataset_info['params'])
@@ -94,6 +95,9 @@ def run_algorithm(args):
         res = None
         if eval == 'map':
             res = algorithm.mean_average_precision()
+
+        if eval == 'ndcg':
+            res = algorithm.normalized_dcg_at_k()
         print(f'{args.algorithm} {eval}: {res}')
 
 
@@ -112,9 +116,9 @@ if __name__ == '__main__':
 
     # Algorithm parser
     alg_parser = subparsers.add_parser('alg', help='run recommender algorithms')
-    alg_parser.add_argument('algorithm', choices=['mfnonvec', 'mp'], help='the recommender algorithm to run')
+    alg_parser.add_argument('algorithm', choices=['mfnonvec', 'mp', 'mp2'], help='the recommender algorithm to run')
     alg_parser.add_argument('dataset', choices=['ml-26m', 'ml-1m', 'ml-100k'], help='the dataset to use')
-    alg_parser.add_argument('evaluation', nargs='+', choices=['map'], help='Evaluation methods')
+    alg_parser.add_argument('evaluation', nargs='+', choices=['map', 'ndcg'], help='Evaluation methods')
     alg_parser.add_argument('-s', '--save', action='store_true', help='save the model for later use')
     alg_parser.add_argument('-l', '--load', help='load model from given directory')
     alg_parser.set_defaults(func=run_algorithm)
@@ -133,6 +137,7 @@ if __name__ == '__main__':
     # Import after the configurations are set.
     from algorithms.matrix_factorization_nonVec import MatrixFactorization as MFNonVec
     from algorithms.mostpopular import MostPopular
+    from algorithms.mostPopular2 import MostPopular2
     from dataset.movielens import MovieLensDS
     from ratings.database import init_db
     from ratings.commands.load_movies_dataset import load_movies, load_ratings
