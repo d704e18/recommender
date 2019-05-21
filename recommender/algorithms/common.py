@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -26,11 +28,11 @@ class Recommender(object):
         normalized_dist_matrix = normalize(distance_matrix, norm='max')
         return 1 - normalized_dist_matrix
 
-    def jaccard_similarities(self, df, columns=(), n_jobs=4):
+    def jaccard_similarities(self, df, columns=(), n_jobs=8):
         features = df
         if columns:
             features = features[list(columns)]
-        jaccard_sim_matrix = pairwise_distances(features, metric='jaccard', n_jobs=n_jobs)
+        jaccard_sim_matrix = pairwise_distances(features.to_numpy(), metric='jaccard', n_jobs=n_jobs)
         return 1 - jaccard_sim_matrix
 
     def combine_similarity_matrices(self, sim_matrices, weights=None):
@@ -51,6 +53,21 @@ class Recommender(object):
                 pd.Series([id, (ratings_total / size)], index=user_average_ratings.columns), ignore_index=True)
 
         return user_average_ratings
+
+    def mae(self, rating_df=None):
+        ratings = self.dataset.df_test
+        ae = 0
+        for rating in ratings.itertuples():
+            ae += abs((rating.rating) - self.get_prediction(rating.user_id, rating.movie_id))
+        return ae/ratings.shape[0]
+
+    def rmse(self, rating_df=None):
+        ratings = self.dataset.df_test
+        se = 0
+        for rating in ratings.itertuples():
+            se += (rating.rating - self.get_prediction(rating.user_id, rating.movie_id))**2
+
+        return math.sqrt(se/ratings.shape[0])
 
     def mean_average_precision(self, rating_df=None):
         if rating_df is None:
@@ -82,6 +99,23 @@ class Recommender(object):
             list_of_ap.append(score)
 
         return np.mean(list_of_ap)
+
+    def normalized_dcg_at_k(self, k=10):
+        def discounted_cumulative_gain(scores):
+            return scores[0] + sum(sc / math.log2(ind) for sc, ind in zip(scores[1:], range(2, len(scores)+1)))
+        ratings = self.dataset.ratings
+        ndcgs = []
+        for user in ratings.user_id.unique():
+            top_n_predictions = [x[0] for x in self.top_n(n=k, user=user)]
+            users_ratings = ratings.loc[ratings.user_id == user]
+            top_n_ratings = users_ratings.nlargest(k, 'rating').rating.tolist()
+            relevances = [0.] * k
+            for i, x in enumerate(top_n_predictions):
+                relevances[i] = users_ratings.loc[x == users_ratings.movie_id].iloc[0]['rating']\
+                    if x in users_ratings.movie_id.unique() else 0
+            idcg = discounted_cumulative_gain(top_n_ratings)
+            ndcgs.append(discounted_cumulative_gain(relevances) / idcg)
+        return np.mean(ndcgs)
 
     def save_model(self, dataset):
         return NotImplementedError('Implement in subclasses.')
