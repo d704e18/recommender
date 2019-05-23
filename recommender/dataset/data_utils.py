@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 
-def transform_ratings(pure_ratings: pd.DataFrame, item_features, user_features):
+def transform_ratings(pure_ratings: pd.DataFrame, item_features):
 
     # First, drop items not in both sets
     pure_ratings = pure_ratings[pure_ratings['movie_id'].isin(item_features['movie_id'])]
@@ -21,15 +21,20 @@ def transform_ratings(pure_ratings: pd.DataFrame, item_features, user_features):
 
 
     user_movies = {}
+    user_ratings = {}
     for key in pure_ratings['user_id'].unique():
         user_movies[key] = list(grouped_users.get_group(key)['movie_id'])
+        user_ratings[key] = list(grouped_users.get_group(key)['rating'])
+
 
 
     movie_users = {}
+    movie_ratings = {}
     for key in pure_ratings['movie_id'].unique():
         movie_users[key] = list(grouped_movies.get_group(key)['user_id'])
+        movie_ratings[key] = list(grouped_movies.get_group(key)['rating'])
 
     print(pure_ratings.head())
 
 
-    return user_movies, movie_users, pure_ratings.drop('timestamp', axis=1)
+    return user_movies, user_ratings, movie_users, movie_ratings, pure_ratings.drop('timestamp', axis=1)

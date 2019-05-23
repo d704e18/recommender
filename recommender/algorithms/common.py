@@ -6,14 +6,12 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import pairwise_distances
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import normalize
-from dataset.data_utils import transform_ratings
 
 
 class Recommender(object):
     def __init__(self, dataset, train_size=0.8):
         self.dataset = dataset
         self.train_size = train_size
-        self.user_movies, self.movie_user, self.transRatings = transform_ratings(dataset.ratings, dataset.items, dataset.users)
 
     def tfidf_cosine_similarities(self, df, columns=('title', 'original_title', 'summary')):
         """Compute the similarity between items by columns containing text."""
@@ -122,20 +120,6 @@ class Recommender(object):
             idcg = discounted_cumulative_gain(top_n_ratings)
             ndcgs.append(discounted_cumulative_gain(relevances) / idcg)
         return np.mean(ndcgs)
-
-    def dcg(self, pred_ids, actual_ids):
-
-        act_mask = np.isin(actual_ids, pred_ids)
-
-        gain = 2**act_mask-1
-        discounts = np.log2(np.arange(len(pred_ids))+2)
-
-        return np.sum(gain/discounts)
-
-    def ndcg(self, k=10):
-        
-
-
 
     def save_model(self, dataset):
         return NotImplementedError('Implement in subclasses.')

@@ -1,15 +1,12 @@
 import numpy as np
 import pandas as pd
 
-from .common import Recommender
 
-
-class MostPopular2(Recommender):
+class MostPopular2:
 
     Most_Popular = None
 
-    def __init__(self, dataset, train_size=0.8, alpha=0):
-        Recommender.__init__(self, dataset, train_size)
+    def __init__(self, alpha=2):
         self.alpha = alpha
 
     def fit(self, ratings):
@@ -36,7 +33,7 @@ class MostPopular2(Recommender):
         self.Most_Popular = res
         return res
 
-    def top_n(self, n, user=None):
+    def predict_n(self, n, user=None):
         if self.Most_Popular is None:
             raise EnvironmentError("A model has not yet been fitted, please call fit() with eligible parameters")
 

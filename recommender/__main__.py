@@ -142,7 +142,8 @@ if __name__ == '__main__':
     from ratings.database import init_db
     from ratings.commands.load_movies_dataset import load_movies, load_ratings
     from ratings.commands.preprocessing import preprocess_movies
+    from main2 import main2
 
     # Call selected function with arguments
     # https://docs.python.org/3.7/library/argparse.html#argparse.ArgumentParser.add_subparsers
-    args.func(args)
+    main2()
