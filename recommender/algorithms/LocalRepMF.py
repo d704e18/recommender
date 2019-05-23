@@ -3,6 +3,7 @@ import os
 import pickle
 import random
 from collections import OrderedDict
+import math
 
 import pandas as pd
 import numpy as np
@@ -18,7 +19,9 @@ class LocalRepMF(object):
 
     def fit(self,
             ratingsMatrix : np.ndarray,
+            test_matrix : np.ndarray,
             number_of_cand_items : int,
+            divranks,
             l1 : int, # number of global questions
             l2 : int, # number of local questions
             alpha = 0.01, # regularisation param
@@ -35,10 +38,9 @@ class LocalRepMF(object):
 
         # Generate candidate item set
         print("Generating candidate item set")
-        cand_set = generate_candidate_set(ratingsMatrix, boundry)
         # sort candidate set based on divranks
         sorted_cand_items = OrderedDict(sorted(
-                cand_set.items(),
+                divranks.items(),
                 key=lambda kv: kv[1],
                 reverse=True))
 
@@ -51,11 +53,15 @@ class LocalRepMF(object):
                 users.append(user)
 
         list_of_losses = []
-
+        list_of_rmse = []
+        list_of_mae = []
+        list_of_p1 = []
+        list_of_p5 = []
+        list_of_p10 = []
+        list_of_ndcg10 = []
         for step in range (0, epochs):
             print(f'Starting iteration: {step}')
-            print(f'Time: {datetime.datetime.now()}')
-            # Generate global questions
+            #region Generate global questions
             groups, global_questions = growTree(
                 ratingsMatrix=ratingsMatrix,
                 V=V,
@@ -69,9 +75,9 @@ class LocalRepMF(object):
                 already_asked_items=[],
                 questions=[]
             )
+            #endregion
 
-            # Generate local questions and learn
-            # transformation matrices for each group
+            #region Generate local questions and learn transformation matrices for each group
             local_questions, list_of_Ts = optimizeTransformationMatrices(
                 ratingsMatrix=ratingsMatrix,
                 V=V,
@@ -79,9 +85,10 @@ class LocalRepMF(object):
                 global_questions=global_questions,
                 local_questions_count=l2,
                 alpha=0.01)
+            #endregion
 
-            # Optimize V with equation 7
-            V_old = V.copy()
+            #region Optimize V with equation 7
+            V_first = V.copy()
             V = optimizeGlobalItemRepMatrix(
                 ratingsMatrix=ratingsMatrix,
                 groups=groups,
@@ -91,10 +98,9 @@ class LocalRepMF(object):
                 n_users=n_users,
                 beta = beta
             )
-            print(f'Time: {datetime.datetime.now()}')
+            #endregion
 
             loss = 0
-            normalized_loss = 0
             for group, gq, lq, t in zip(groups, global_questions, local_questions, list_of_Ts):
                 R = ratingsMatrix[group]
 
@@ -106,16 +112,41 @@ class LocalRepMF(object):
                 B = np.hstack((U1, U2, e))
 
                 predictions = B @ t @ V
+                loss += np.linalg.norm(R - predictions) + alpha * np.linalg.norm(t) + beta * np.linalg.norm(V)
 
-                loss += np.linalg.norm(R[R != 0] - predictions[R != 0]) + alpha * np.linalg.norm(t) + beta * np.linalg.norm(V)
-                n_ratings = len(R[R != 0])
-                if n_ratings > 0:
-                    normalized_loss += loss / n_ratings
+            list_of_losses.append(loss)
+            print(f'Loss: {loss}')
 
-            list_of_losses.append(normalized_loss)
-            print(f'Loss: {normalized_loss}')
+            rmse, mae, p1, p5, p10, ndcg10 = test_model(test_matrix=test_matrix,
+                       global_questions=global_questions,
+                       local_questions=local_questions,
+                       list_of_Ts=list_of_Ts,
+                       V=V)
+            list_of_rmse.append(rmse)
+            list_of_mae.append(mae)
+            list_of_p1.append(p1)
+            list_of_p5.append(p5)
+            list_of_p10.append(p10)
+            list_of_ndcg10.append(ndcg10)
 
-        return global_questions, local_questions, list_of_Ts, V, list_of_losses
+            # Store best model
+            if not list_of_losses:
+                best_global_questions = global_questions
+                best_local_questions = local_questions
+                best_list_of_Ts = list_of_Ts
+                best_V = V
+            elif loss < list_of_losses[step - 1]:
+                best_global_questions = global_questions
+                best_local_questions = local_questions
+                best_list_of_Ts = list_of_Ts
+                best_V = V
+
+        return best_global_questions, \
+               best_local_questions, \
+               best_list_of_Ts, \
+               best_V, list_of_losses, list_of_rmse, \
+               list_of_mae, list_of_p1, list_of_p5, list_of_p10
+
 
 def growTree(ratingsMatrix : np.ndarray,
              V : np.ndarray,
@@ -146,9 +177,10 @@ def growTree(ratingsMatrix : np.ndarray,
             for user in users:
                 if ratingsMatrix[user, item] >= split_value:
                     likes.append(user)
-                elif ratingsMatrix[user, item] > 0:
+                else:
                     dislikes.append(user)
 
+            #region Stuff for eq. 11
             # generating ratings matrices for users who liked and disliked item
             ratingsMatrix_like = ratingsMatrix[likes]
             ratingsMatrix_dislike =  ratingsMatrix[dislikes]
@@ -172,6 +204,7 @@ def growTree(ratingsMatrix : np.ndarray,
             Y_dislike = alpha * np.linalg.inv(V @ V.T)
             Z_dislike = B_dislike.T @ ratingsMatrix_dislike @ V.T @ np.linalg.inv(V @ V.T)
             T_dislike = scipy.linalg.solve_sylvester(X_dislike, Y_dislike, Z_dislike)
+            #endregion
 
             # Computing loss (||(rating - prediction)||^2 + alpha * ||T||^2
             loss_like = evaluate_eq11(ratingsMatrix_like, B_like, T_like, V, alpha)
@@ -188,6 +221,7 @@ def growTree(ratingsMatrix : np.ndarray,
         global_questions = already_asked_items.copy()
         global_questions.append(best_item)
 
+        # region Splitting
         # Not a leaf node
         cand_items.remove(best_item) # I cand - i*
 
@@ -220,6 +254,8 @@ def growTree(ratingsMatrix : np.ndarray,
             already_asked_items=global_questions)
 
         cand_items.append(best_item) # I cand + i*
+        #endregion
+
 
     return groups, questions
 
@@ -364,9 +400,9 @@ def load_divrank(filepath):
     pickle_file = open(filepath, "rb")
     return pickle.load(pickle_file)
 
-def create_and_save_divrank(ratingsMatrix : np.ndarray, boundry : int):
+def create_and_save_divrank(filename, ratingsMatrix : np.ndarray, boundry : int):
     dirname = os.path.dirname(__file__)
-    path_to_ranks = os.path.join(dirname, "../data/divrank.pkl")
+    path_to_ranks = os.path.join(dirname, f'../data/{filename}.pkl')
     # represent network as matrix
     network = colike_itemitem_network(ratingsMatrix, boundry)
 
@@ -378,16 +414,175 @@ def create_and_save_divrank(ratingsMatrix : np.ndarray, boundry : int):
 
     return ranks
 
-def generate_candidate_set(ratingsMatrix, boundry : int):
+def generate_candidate_set(filename, ratingsMatrix, boundry : int):
     dirname = os.path.dirname(__file__)
-    path_to_ranks = os.path.join(dirname, "../data/divrank_u1.pkl")
+    path_to_ranks = os.path.join(dirname, f'../data/{filename}.pkl')
     ranks_exist = os.path.isfile(path_to_ranks)
     if not ranks_exist:
-        ranks = create_and_save_divrank(ratingsMatrix, boundry)
+        ranks = create_and_save_divrank(filename, ratingsMatrix, boundry)
     else:
         ranks = load_divrank(path_to_ranks)
 
     return ranks
+
+
+def test_user_belongs_to_group(ratings, userId, global_questions, question_number = 0, number_of_dislikes = 0):
+    n_groups = len(global_questions)
+
+    if n_groups == 1:
+        return number_of_dislikes
+    else:
+        question = global_questions[0][question_number]
+        answer = ratings[question]
+        split_question_idx = int(n_groups / 2)
+
+        if answer >= 4:
+            return test_user_belongs_to_group(
+                ratings, userId, global_questions[:split_question_idx],
+                question_number + 1, number_of_dislikes)
+        else:
+            return test_user_belongs_to_group(
+                ratings, userId, global_questions[split_question_idx:],
+                question_number + 1, number_of_dislikes + split_question_idx)
+
+def test_model(test_matrix : np.ndarray,
+               global_questions : list,
+               local_questions : list,
+               list_of_Ts : list,
+               V: np.ndarray):
+    root_mean_squared_error = 0
+    mean_abs_error = 0
+    precision_1 = 0
+    precision_5 = 0
+    precision_10 = 0
+    ndcg_at_10 = 0
+
+    n_users, _ = test_matrix.shape
+    # making list of test-user idx
+    users = []
+    for test_user in range(n_users):
+        if sum(test_matrix[test_user] > 0):
+            users.append(test_user)
+    # preparing dicts with users
+    users_dict : dict = {}
+    for idx in range(len(global_questions)):
+        users_dict[idx] = []
+
+    # adding test users to right groups
+    for test_user in users:
+        user_ratings = test_matrix[test_user]
+        group_id = test_user_belongs_to_group(user_ratings, test_user,
+                                              global_questions)
+        users_dict[group_id] += [test_user]
+
+    for group, gq, lq, t in zip(users_dict.values(), global_questions, local_questions, list_of_Ts):
+        R = test_matrix[group]
+
+        ng = len(group)
+        # create B
+        U1 = R[:, gq]
+        U2 = R[:, lq]
+        e = np.ones(shape=(ng, 1))
+        B = np.hstack((U1, U2, e))
+
+        predictions = B @ t @ V
+        root_mean_squared_error += rmse(predictions, R)
+        mean_abs_error += mae(predictions, R)
+        precision_1 += precision_at(1, predictions, R)
+        precision_5 += precision_at(5, predictions, R)
+        precision_10 += precision_at(10, predictions, R)
+        ndcg_at_10 += ndcg_at_k(10, predictions, R)
+
+    n_groups = np.sum([bool(x) for x in users_dict.values()])
+
+    return root_mean_squared_error/n_groups, \
+           mean_abs_error/n_groups, \
+           precision_1/n_groups, \
+           precision_5/n_groups, \
+           precision_10/n_groups, \
+           ndcg_at_10/n_groups
+
+def precision_at(k : int,
+                 predictions,
+                 actuals,
+                 relevant_boundry : int = 4):
+    n_users, _ = actuals.shape
+
+    if n_users == 0:
+        return 0
+
+    res = 0
+    for user in range(n_users):
+        sorted_predictions_idx = predictions[user].argsort()[::-1]
+        top_k_predictions_idx = sorted_predictions_idx[:k]
+
+        actual_row = actuals[user]
+        tp = np.sum(actual_row[top_k_predictions_idx] >= relevant_boundry)
+
+        res += tp / k
+
+    return res/n_users
+
+def rmse(predictions, actuals):
+    n = len(predictions[actuals != 0])
+    if n == 0:
+        return 0
+    error = np.square(predictions[actuals != 0] - actuals[actuals != 0])
+    return np.sqrt(np.sum(error)/n)
+
+def mae(predictions, actuals):
+    n = len(predictions[actuals != 0])
+    if n == 0:
+        return 0
+    error = np.abs(predictions[actuals != 0] - actuals[actuals != 0])
+    return (np.sum(error) / n)
+
+def dcg_at_k(k : int, relevant_boundry : int, predictions, actuals):
+    n_users, _ = actuals.shape
+
+    res = 0
+    for user in range(n_users):
+        sorted_predictions_idx = predictions[user].argsort()[::-1]
+        top_k_predictions_idx = sorted_predictions_idx[:k]
+
+        actual_row = actuals[user]
+        user_res = 0
+        for item, index in zip(top_k_predictions_idx, list(range(1, k + 1))):
+            rel_i = 1 if actual_row[item] >= relevant_boundry else 0
+
+            user_res += rel_i / math.log(index + 1, 2)
+
+        res += user_res
+
+    return res / n_users
+
+def idcg_at_k(k : int, relevant_boundry : int, actuals):
+    n_users, _ = actuals.shape
+
+    res = 0
+    for user in range(n_users):
+        sorted_actual_row = np.sort(actuals[user])[::-1]
+
+        user_res = 0
+        for actual_value, index in zip(sorted_actual_row, list(range(1, k + 1))):
+            rel_i = 1 if actual_value >= relevant_boundry else 0
+
+            user_res += rel_i / math.log(index + 1, 2)
+
+        res += user_res
+
+    return res / n_users
+
+def ndcg_at_k(k : int, predictions, actuals, relevant_boundry : int = 4):
+    n_users, _ = actuals.shape
+
+    if n_users == 0:
+        return 0
+
+    return dcg_at_k(k, relevant_boundry, predictions, actuals) / \
+           idcg_at_k(k, relevant_boundry, actuals)
+
+
 
 
 

@@ -109,7 +109,7 @@ class DivRank(object):
             if step % 25 == 0:
                 print(f'step: {step}. delta: {delta}')
 
-            if delta <= epsilon:
+            if delta <= epsilon or step == steps - 1:
                 return collections.OrderedDict(newRanks)
 
             ranks = newRanks
